@@ -16,8 +16,8 @@ class TextEditor:
         self.text_area.tag_configure("bold", font=("Arial", 12, "bold"))
         self.text_area.tag_configure("italic", font=("Arial", 12, "italic"))
         self.text_area.tag_configure("underline", font=("Arial", 12, "underline"))
-        self.text_area.tag_configure("color", foreground="black")  # Tag para a cor do texto
-        self.text_area.tag_configure("size", font=("Arial", 12))  # Tag para o tamanho do texto
+        self.text_area.tag_configure("size", font=("Arial", 12))  # Tamanho da fonte
+        self.text_area.tag_configure("color", foreground="black")  # Cor do texto
 
     def create_buttons(self):
         button_frame = tk.Frame(self.root)
@@ -50,11 +50,7 @@ class TextEditor:
     def change_color(self):
         color = colorchooser.askcolor()[1]
         if color:
-            try:
-                self.text_area.tag_configure("color", foreground=color)
-                self.text_area.tag_add("color", "sel.first", "sel.last")
-            except tk.TclError:
-                pass  # Ignorar se nada estiver selecionado
+            self._apply_tag_with_color("color", color)
 
     def increase_font_size(self):
         self._change_font_size(2)
@@ -64,13 +60,14 @@ class TextEditor:
 
     def _change_font_size(self, delta):
         try:
-            current_tags = self.text_area.tag_names("sel.first")
+            start, end = self.text_area.index("sel.first"), self.text_area.index("sel.last")
             current_font = font.Font(font=self.text_area.tag_cget("size", "font"))
             new_size = max(current_font.actual("size") + delta, 1)  # Evitar tamanho 0
             new_font = (current_font.actual("family"), new_size)
-            
+
+            # Aplicar a mudança de tamanho mantendo as tags de estilo
             self.text_area.tag_configure("size", font=new_font)
-            self.text_area.tag_add("size", "sel.first", "sel.last")
+            self.text_area.tag_add("size", start, end)
         except tk.TclError:
             pass  # Ignorar se nada estiver selecionado
 
@@ -84,12 +81,29 @@ class TextEditor:
         self._toggle_tag("underline")
 
     def _toggle_tag(self, tag):
+        """Ativa ou desativa uma tag na seleção atual."""
         try:
-            current_tags = self.text_area.tag_names("sel.first")
-            if tag in current_tags:
-                self.text_area.tag_remove(tag, "sel.first", "sel.last")
+            start, end = self.text_area.index("sel.first"), self.text_area.index("sel.last")
+            if tag in self.text_area.tag_names("sel.first"):
+                self.text_area.tag_remove(tag, start, end)
             else:
-                self.text_area.tag_add(tag, "sel.first", "sel.last")
+                self.text_area.tag_add(tag, start, end)
+        except tk.TclError:
+            pass  # Ignorar se nada estiver selecionado
+
+    def _apply_tag_with_color(self, tag, color):
+        """Aplica a cor apenas no texto selecionado e não no restante do conteúdo."""
+        try:
+            start, end = self.text_area.index("sel.first"), self.text_area.index("sel.last")
+            # Manter as tags existentes (negrito, itálico, sublinhado) ao aplicar a cor
+            existing_tags = self.text_area.tag_names(start)
+            self.text_area.tag_add(tag, start, end)
+            self.text_area.tag_configure(tag, foreground=color)  # Configura a cor somente para a seleção
+
+            # Reaplicar todas as outras tags ao texto selecionado
+            for existing_tag in existing_tags:
+                if existing_tag != tag:  # Evitar aplicar a tag de cor novamente
+                    self.text_area.tag_add(existing_tag, start, end)
         except tk.TclError:
             pass  # Ignorar se nada estiver selecionado
 
